@@ -3,76 +3,64 @@ import Hls from 'hls.js';
 
 export default function App() {
     const videoRef = useRef(null);
-    const hlsRef = useRef(null); // to store HLS instance
     const [info, setInfo] = useState(null);
 
     useEffect(() => {
         function handleMessage(event) {
-            // Optional: restrict origin
-           if (event.origin !== "https://archon1.wixsite.com") return;
+            // Security check: accept messages only from your Wix site origin or your userscript origin
+            const allowedOrigins = [
+                'https://archon1.wixsite.com',    // Wix site origin
+                'https://hlsplayer-liard.vercel.app' // Your player origin
+                // add more if needed
+            ];
+            if (!allowedOrigins.includes(event.origin)) return;
 
+            if (!event.data.url || !event.data.cookies) return;
 
-            const { url, cookies, ua } = event.data || {};
+            const streamInfo = {
+                url: event.data.url,
+                cookies: event.data.cookies,
+                ua: event.data.ua
+            };
 
-            if (!url || !url.includes('.m3u8')) {
-                console.warn("Invalid or missing .m3u8 URL in message.");
-                return;
-            }
-
-            const streamInfo = { url, cookies, ua };
             setInfo(streamInfo);
 
-            // Clean up previous HLS instance if exists
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
-
-            // Load new stream
             if (Hls.isSupported()) {
                 const hls = new Hls();
-                hls.loadSource(url);
+                hls.loadSource(streamInfo.url);
                 hls.attachMedia(videoRef.current);
-                hlsRef.current = hls;
             } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-                videoRef.current.src = url;
-            } else {
-                console.error("HLS not supported in this browser.");
+                videoRef.current.src = streamInfo.url;
             }
 
-            // Send info to Wix backend
+            // Send stream info to Wix backend for persistence
             fetch("https://archon1.wixsite.com/_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url, ua })
+                body: JSON.stringify({
+                    url: streamInfo.url,
+                    ua: streamInfo.ua
+                })
             })
                 .then(res => res.json())
-                .then(data => console.log("[Wix] Stream saved:", data))
-                .catch(err => console.error("[Wix] Failed to save stream:", err));
+                .then(data => {
+                    console.log("[Wix] Stream saved:", data);
+                })
+                .catch(err => {
+                    console.error("[Wix] Failed to save stream:", err);
+                });
         }
 
         window.addEventListener('message', handleMessage);
-        return () => {
-            window.removeEventListener('message', handleMessage);
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-            }
-        };
+
+        // Cleanup listener on unmount
+        return () => window.removeEventListener('message', handleMessage);
     }, []);
 
     return (
-        <div style={{
-            minHeight: '100vh',
-            background: 'black',
-            color: 'white',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-        }}>
+        <div style={{ minHeight: '100vh', background: 'black', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <h1 style={{ marginBottom: '20px' }}>Custom HLS Player</h1>
-            <video ref={videoRef} controls autoPlay style={{ maxWidth: '90vw', borderRadius: '8px' }} />
+            <video ref={videoRef} controls autoPlay style={{ maxWidth: '90vw' }} />
             {info && (
                 <div style={{ marginTop: '20px', fontSize: '14px', color: 'gray' }}>
                     <p><strong>URL:</strong> {info.url}</p>
