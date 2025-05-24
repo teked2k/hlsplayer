@@ -26,7 +26,7 @@ export default function App() {
             }
 
             // Send stream info to Wix backend
-            fetch("https://your-wix-site.com/_functions/submitStream", {
+            fetch("https://archon1.wixsite.com/xtention/_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
