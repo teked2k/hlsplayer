@@ -7,39 +7,30 @@ export default function App() {
 
     useEffect(() => {
         function handleMessage(event) {
-            // Security check: accept messages only from your Wix site origin or your userscript origin
-            const allowedOrigins = [
-                'https://archon1.wixsite.com',    // Wix site origin
-                'https://hlsplayer-liard.vercel.app' // Your player origin
-                // add more if needed
-            ];
-            if (!allowedOrigins.includes(event.origin)) return;
+            const { url, cookies, ua, sessionId } = event.data || {};
 
-            if (!event.data.url || !event.data.cookies) return;
+            if (!url || !cookies) return; // Require these fields
 
-            const streamInfo = {
-                url: event.data.url,
-                cookies: event.data.cookies,
-                ua: event.data.ua
-            };
-
+            const streamInfo = { url, cookies, ua, sessionId };
             setInfo(streamInfo);
 
             if (Hls.isSupported()) {
                 const hls = new Hls();
-                hls.loadSource(streamInfo.url);
+                hls.loadSource(url);
                 hls.attachMedia(videoRef.current);
             } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-                videoRef.current.src = streamInfo.url;
+                videoRef.current.src = url;
             }
 
-            // Send stream info to Wix backend for persistence
+            // Send stream info to Wix backend, including sessionId if available
             fetch("https://archon1.wixsite.com/_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    url: streamInfo.url,
-                    ua: streamInfo.ua
+                    url,
+                    ua,
+                    sessionId,  // added here
+                    cookies,    // optionally send cookies if needed
                 })
             })
                 .then(res => res.json())
@@ -52,8 +43,6 @@ export default function App() {
         }
 
         window.addEventListener('message', handleMessage);
-
-        // Cleanup listener on unmount
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
@@ -65,6 +54,7 @@ export default function App() {
                 <div style={{ marginTop: '20px', fontSize: '14px', color: 'gray' }}>
                     <p><strong>URL:</strong> {info.url}</p>
                     <p><strong>User-Agent:</strong> {info.ua}</p>
+                    {info.sessionId && <p><strong>Session ID:</strong> {info.sessionId}</p>}
                 </div>
             )}
         </div>
