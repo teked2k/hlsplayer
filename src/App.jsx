@@ -9,7 +9,8 @@ export default function App() {
     useEffect(() => {
         function handleMessage(event) {
             // Optional: restrict origin
-            if (event.origin !== "https://archon1.wixsite.com") return;
+           if (event.origin !== "https://archon1.wixsite.com") return;
+
 
             const { url, cookies, ua } = event.data || {};
 
