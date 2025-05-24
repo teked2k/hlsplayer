@@ -3,43 +3,52 @@ import Hls from 'hls.js';
 
 export default function App() {
     const videoRef = useRef(null);
-    const hlsRef = useRef(null); // to store HLS instance
+    const hlsRef = useRef(null);
     const [info, setInfo] = useState(null);
 
     useEffect(() => {
         function handleMessage(event) {
-            // Optional: restrict origin
-            // if (event.origin !== "https://your-wix-site.com") return;
+            // Security: validate origin
+            if (event.origin !== "https://archon1.wixsite.com") return;
 
-            const { url, cookies, ua } = event.data || {};
+            // Safety: validate data structure
+            if (!event.data || typeof event.data !== 'object') return;
+
+            const { url, cookies, ua } = event.data;
 
             if (!url || !url.includes('.m3u8')) {
                 console.warn("Invalid or missing .m3u8 URL in message.");
                 return;
             }
 
-            const streamInfo = { url, cookies, ua };
-            setInfo(streamInfo);
-
-            // Clean up previous HLS instance if exists
+            // Clean up previous instance
             if (hlsRef.current) {
                 hlsRef.current.destroy();
                 hlsRef.current = null;
             }
 
-            // Load new stream
             if (Hls.isSupported()) {
                 const hls = new Hls();
                 hls.loadSource(url);
                 hls.attachMedia(videoRef.current);
+
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error("HLS error:", data);
+                });
+
                 hlsRef.current = hls;
             } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
                 videoRef.current.src = url;
             } else {
                 console.error("HLS not supported in this browser.");
+                return;
             }
 
-            // Send info to Wix backend
+            // Update stream info AFTER player setup
+            const streamInfo = { url, cookies, ua };
+            setInfo(streamInfo);
+
+            // Save info to backend
             fetch("https://archon1.wixsite.com/_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -51,10 +60,15 @@ export default function App() {
         }
 
         window.addEventListener('message', handleMessage);
+
         return () => {
             window.removeEventListener('message', handleMessage);
             if (hlsRef.current) {
                 hlsRef.current.destroy();
+                hlsRef.current = null;
+            }
+            if (videoRef.current) {
+                videoRef.current.src = '';
             }
         };
     }, []);
@@ -71,7 +85,12 @@ export default function App() {
             padding: '20px'
         }}>
             <h1 style={{ marginBottom: '20px' }}>Custom HLS Player</h1>
-            <video ref={videoRef} controls autoPlay style={{ maxWidth: '90vw', borderRadius: '8px' }} />
+            <video
+                ref={videoRef}
+                controls
+                autoPlay
+                style={{ maxWidth: '90vw', borderRadius: '8px' }}
+            />
             {info && (
                 <div style={{ marginTop: '20px', fontSize: '14px', color: 'gray' }}>
                     <p><strong>URL:</strong> {info.url}</p>
