@@ -120,17 +120,6 @@ export default function App() {
                 <button onClick={handleSaveUrl} style={{ width: '100%', padding: '10px', marginBottom: '16px' }}>
                     Save URL
                 </button>
-
-                <input
-                    type="text"
-                    placeholder="Cookies"
-                    value={tempCookies}
-                    onChange={(e) => setTempCookies(e.target.value)}
-                    style={{ width: '100%', padding: '8px', marginBottom: '8px' }}
-                />
-                <button onClick={handleSaveCookies} style={{ width: '100%', padding: '10px' }}>
-                    Save Cookies
-                </button>
             </div>
 
             {shareId && (
