@@ -6,8 +6,6 @@ export default function App() {
     const [info, setInfo] = useState({ url: '' });
     const [tempUrl, setTempUrl] = useState('');
     const [shareId, setShareId] = useState(null);
-
-    // New state for bookmarks
     const [bookmarks, setBookmarks] = useState([]);
 
     // Load bookmarks from localStorage on mount
@@ -61,7 +59,6 @@ export default function App() {
         initializePlayer(tempUrl);
         saveStreamInfo(tempUrl);
 
-        // Add to bookmarks if not already present
         if (!bookmarks.includes(tempUrl)) {
             setBookmarks(prev => [...prev, tempUrl]);
         }
@@ -81,11 +78,18 @@ export default function App() {
                     setTempUrl(data.url);
                     initializePlayer(data.url);
                     setShareId(id);
+
+                    if (!bookmarks.includes(data.url)) {
+                        setBookmarks(prev => [...prev, data.url]);
+                    }
                 })
                 .catch(err => console.error("Failed to load shared stream:", err));
         }
 
         const handleMessage = (event) => {
+            // OPTIONAL: Check event.origin if you want to filter only from Wix
+            // if (!event.origin.includes("wixsite.com")) return;
+
             const { url } = event.data || {};
             if (!url) return;
 
@@ -94,23 +98,24 @@ export default function App() {
             setTempUrl(url);
             initializePlayer(url);
             saveStreamInfo(url);
+
+            if (!bookmarks.includes(url)) {
+                setBookmarks(prev => [...prev, url]);
+            }
         };
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, []);
+    }, [bookmarks]);
 
-    // Click bookmark to load & play URL
     const handleBookmarkClick = (url) => {
         setTempUrl(url);
         setInfo({ url });
         initializePlayer(url);
     };
 
-    // Delete bookmark from list
     const handleDeleteBookmark = (url) => {
         setBookmarks(prev => prev.filter(b => b !== url));
-        // If currently playing that URL, clear it (optional)
         if (info.url === url) {
             setInfo({ url: '' });
             setTempUrl('');
@@ -160,7 +165,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* Bookmarks List */}
             {bookmarks.length > 0 && (
                 <div style={{
                     marginTop: '30px',
@@ -184,7 +188,12 @@ export default function App() {
                             }}>
                                 <span
                                     onClick={() => handleBookmarkClick(url)}
-                                    style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    style={{
+                                        flexGrow: 1,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}
                                     title={url}
                                 >
                                     {url}
