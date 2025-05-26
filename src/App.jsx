@@ -7,6 +7,22 @@ export default function App() {
     const [tempUrl, setTempUrl] = useState('');
     const [shareId, setShareId] = useState(null);
 
+    // New state for bookmarks
+    const [bookmarks, setBookmarks] = useState([]);
+
+    // Load bookmarks from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('bookmarkedUrls');
+        if (saved) {
+            setBookmarks(JSON.parse(saved));
+        }
+    }, []);
+
+    // Save bookmarks to localStorage whenever it changes
+    useEffect(() => {
+        localStorage.setItem('bookmarkedUrls', JSON.stringify(bookmarks));
+    }, [bookmarks]);
+
     const initializePlayer = (url) => {
         if (Hls.isSupported()) {
             const hls = new Hls();
@@ -22,7 +38,7 @@ export default function App() {
             const res = await fetch("https://archon1.wixsite.com/xtention_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ url }) // Only send the .m3u8 URL
+                body: JSON.stringify({ url })
             });
 
             const data = await res.json();
@@ -38,14 +54,20 @@ export default function App() {
     };
 
     const handleSaveUrl = () => {
+        if (!tempUrl) return;
+
         const updatedInfo = { url: tempUrl };
         setInfo(updatedInfo);
         initializePlayer(tempUrl);
-        if (tempUrl) {
-            saveStreamInfo(tempUrl);
+        saveStreamInfo(tempUrl);
+
+        // Add to bookmarks if not already present
+        if (!bookmarks.includes(tempUrl)) {
+            setBookmarks(prev => [...prev, tempUrl]);
         }
     };
 
+    // Load shared stream from URL id param
     useEffect(() => {
         const query = new URLSearchParams(window.location.search);
         const id = query.get("id");
@@ -77,6 +99,25 @@ export default function App() {
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, []);
+
+    // Click bookmark to load & play URL
+    const handleBookmarkClick = (url) => {
+        setTempUrl(url);
+        setInfo({ url });
+        initializePlayer(url);
+    };
+
+    // Delete bookmark from list
+    const handleDeleteBookmark = (url) => {
+        setBookmarks(prev => prev.filter(b => b !== url));
+        // If currently playing that URL, clear it (optional)
+        if (info.url === url) {
+            setInfo({ url: '' });
+            setTempUrl('');
+            videoRef.current.pause();
+            videoRef.current.src = '';
+        }
+    };
 
     return (
         <div style={{
@@ -116,6 +157,59 @@ export default function App() {
             {info.url && (
                 <div style={{ marginTop: '20px', fontSize: '14px', color: 'gray', textAlign: 'left', maxWidth: '600px' }}>
                     <p><strong>URL:</strong> {info.url}</p>
+                </div>
+            )}
+
+            {/* Bookmarks List */}
+            {bookmarks.length > 0 && (
+                <div style={{
+                    marginTop: '30px',
+                    width: '100%',
+                    maxWidth: '600px',
+                    color: 'white',
+                    textAlign: 'left'
+                }}>
+                    <h3>Bookmarks</h3>
+                    <ul style={{ listStyle: 'none', padding: 0 }}>
+                        {bookmarks.map((url) => (
+                            <li key={url} style={{
+                                marginBottom: '8px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                backgroundColor: '#222',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}>
+                                <span
+                                    onClick={() => handleBookmarkClick(url)}
+                                    style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    title={url}
+                                >
+                                    {url}
+                                </span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteBookmark(url);
+                                    }}
+                                    style={{
+                                        marginLeft: '10px',
+                                        backgroundColor: 'red',
+                                        border: 'none',
+                                        color: 'white',
+                                        borderRadius: '3px',
+                                        cursor: 'pointer',
+                                        padding: '4px 8px'
+                                    }}
+                                    aria-label={`Delete bookmark for ${url}`}
+                                >
+                                    Delete
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
         </div>
