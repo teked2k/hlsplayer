@@ -7,7 +7,6 @@ export default function App() {
     const [tempUrl, setTempUrl] = useState('');
     const [shareId, setShareId] = useState(null);
     const [bookmarks, setBookmarks] = useState([]);
-    const [bookmarkInput, setBookmarkInput] = useState('');
 
     const initializePlayer = (url) => {
         if (!url || !videoRef.current) return;
@@ -48,6 +47,7 @@ export default function App() {
         initializePlayer(tempUrl);
         saveStreamInfo(tempUrl);
 
+        // Add to bookmarks if not already present
         if (!bookmarks.includes(tempUrl)) {
             setBookmarks(prev => [...prev, tempUrl]);
         }
@@ -69,14 +69,6 @@ export default function App() {
                 videoRef.current.src = '';
             }
         }
-    };
-
-    const handleAddBookmark = () => {
-        const url = bookmarkInput.trim();
-        if (!url || bookmarks.includes(url)) return;
-
-        setBookmarks(prev => [...prev, url]);
-        setBookmarkInput('');
     };
 
     useEffect(() => {
@@ -207,26 +199,6 @@ export default function App() {
                     </ul>
                 </div>
             )}
-
-            {/* New Bookmark Input */}
-            <div style={{
-                marginTop: '20px',
-                width: '100%',
-                maxWidth: '600px',
-                display: 'flex',
-                gap: '10px'
-            }}>
-                <input
-                    type="text"
-                    placeholder="Add bookmark URL"
-                    value={bookmarkInput}
-                    onChange={(e) => setBookmarkInput(e.target.value)}
-                    style={{ flex: 1, padding: '8px' }}
-                />
-                <button onClick={handleAddBookmark} style={{ padding: '8px 12px' }}>
-                    Add
-                </button>
-            </div>
         </div>
     );
 }
