@@ -6,24 +6,12 @@ export default function App() {
     const [info, setInfo] = useState({ url: '' });
     const [tempUrl, setTempUrl] = useState('');
     const [shareId, setShareId] = useState(null);
-
-    // New state for bookmarks
     const [bookmarks, setBookmarks] = useState([]);
-
-    // Load bookmarks from localStorage on mount
-    useEffect(() => {
-        const saved = localStorage.getItem('bookmarkedUrls');
-        if (saved) {
-            setBookmarks(JSON.parse(saved));
-        }
-    }, []);
-
-    // Save bookmarks to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('bookmarkedUrls', JSON.stringify(bookmarks));
-    }, [bookmarks]);
+    const [bookmarkInput, setBookmarkInput] = useState('');
 
     const initializePlayer = (url) => {
+        if (!url || !videoRef.current) return;
+
         if (Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(url);
@@ -56,18 +44,41 @@ export default function App() {
     const handleSaveUrl = () => {
         if (!tempUrl) return;
 
-        const updatedInfo = { url: tempUrl };
-        setInfo(updatedInfo);
+        setInfo({ url: tempUrl });
         initializePlayer(tempUrl);
         saveStreamInfo(tempUrl);
 
-        // Add to bookmarks if not already present
         if (!bookmarks.includes(tempUrl)) {
             setBookmarks(prev => [...prev, tempUrl]);
         }
     };
 
-    // Load shared stream from URL id param
+    const handleBookmarkClick = (url) => {
+        setTempUrl(url);
+        setInfo({ url });
+        initializePlayer(url);
+    };
+
+    const handleDeleteBookmark = (url) => {
+        setBookmarks(prev => prev.filter(b => b !== url));
+        if (info.url === url) {
+            setInfo({ url: '' });
+            setTempUrl('');
+            if (videoRef.current) {
+                videoRef.current.pause();
+                videoRef.current.src = '';
+            }
+        }
+    };
+
+    const handleAddBookmark = () => {
+        const url = bookmarkInput.trim();
+        if (!url || bookmarks.includes(url)) return;
+
+        setBookmarks(prev => [...prev, url]);
+        setBookmarkInput('');
+    };
+
     useEffect(() => {
         const query = new URLSearchParams(window.location.search);
         const id = query.get("id");
@@ -86,38 +97,23 @@ export default function App() {
         }
 
         const handleMessage = (event) => {
-            const { url } = event.data || {};
-            if (!url) return;
+            const { url, bookmarks: incomingBookmarks } = event.data || {};
 
-            const streamInfo = { url };
-            setInfo(streamInfo);
-            setTempUrl(url);
-            initializePlayer(url);
-            saveStreamInfo(url);
+            if (url) {
+                setInfo({ url });
+                setTempUrl(url);
+                initializePlayer(url);
+                saveStreamInfo(url);
+            }
+
+            if (Array.isArray(incomingBookmarks)) {
+                setBookmarks(incomingBookmarks);
+            }
         };
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
     }, []);
-
-    // Click bookmark to load & play URL
-    const handleBookmarkClick = (url) => {
-        setTempUrl(url);
-        setInfo({ url });
-        initializePlayer(url);
-    };
-
-    // Delete bookmark from list
-    const handleDeleteBookmark = (url) => {
-        setBookmarks(prev => prev.filter(b => b !== url));
-        // If currently playing that URL, clear it (optional)
-        if (info.url === url) {
-            setInfo({ url: '' });
-            setTempUrl('');
-            videoRef.current.pause();
-            videoRef.current.src = '';
-        }
-    };
 
     return (
         <div style={{
@@ -160,7 +156,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* Bookmarks List */}
             {bookmarks.length > 0 && (
                 <div style={{
                     marginTop: '30px',
@@ -212,6 +207,26 @@ export default function App() {
                     </ul>
                 </div>
             )}
+
+            {/* New Bookmark Input */}
+            <div style={{
+                marginTop: '20px',
+                width: '100%',
+                maxWidth: '600px',
+                display: 'flex',
+                gap: '10px'
+            }}>
+                <input
+                    type="text"
+                    placeholder="Add bookmark URL"
+                    value={bookmarkInput}
+                    onChange={(e) => setBookmarkInput(e.target.value)}
+                    style={{ flex: 1, padding: '8px' }}
+                />
+                <button onClick={handleAddBookmark} style={{ padding: '8px 12px' }}>
+                    Add
+                </button>
+            </div>
         </div>
     );
 }
