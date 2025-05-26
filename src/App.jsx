@@ -19,7 +19,7 @@ export default function App() {
 
     const saveStreamInfo = async (url) => {
         try {
-            const res = await fetch("https://archon1.wixsite.com/_functions/submitStream", {
+            const res = await fetch("https://archon1.wixsite.com/xtention_functions/submitStream", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url }) // Only send the .m3u8 URL
