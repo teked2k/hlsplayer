@@ -6,22 +6,9 @@ export default function App() {
     const [info, setInfo] = useState({ url: '' });
     const [tempUrl, setTempUrl] = useState('');
     const [shareId, setShareId] = useState(null);
-
-    // New state for bookmarks
     const [bookmarks, setBookmarks] = useState([]);
 
-    // Load bookmarks from localStorage on mount
-    useEffect(() => {
-        const saved = localStorage.getItem('bookmarkedUrls');
-        if (saved) {
-            setBookmarks(JSON.parse(saved));
-        }
-    }, []);
-
-    // Save bookmarks to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('bookmarkedUrls', JSON.stringify(bookmarks));
-    }, [bookmarks]);
+    const WIX_API_BASE = "https://archon1.wixsite.com/xtention/_functions"; // ?? Replace with your Wix site base URL
 
     const initializePlayer = (url) => {
         if (Hls.isSupported()) {
@@ -53,7 +40,49 @@ export default function App() {
         }
     };
 
-    const handleSaveUrl = () => {
+    const fetchBookmarks = async () => {
+        try {
+            const res = await fetch(`${WIX_API_BASE}/get_bookmarks`);
+            const data = await res.json();
+            if (data.success) {
+                setBookmarks(data.items.map(item => item.url));
+            }
+        } catch (err) {
+            console.error("Failed to fetch bookmarks", err);
+        }
+    };
+
+    const addBookmarkToWix = async (url) => {
+        try {
+            const res = await fetch(`${WIX_API_BASE}/post_bookmark`, {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url }),
+            });
+            const data = await res.json();
+            return data.success;
+        } catch (err) {
+            console.error("Failed to add bookmark to Wix", err);
+            return false;
+        }
+    };
+
+    const deleteBookmarkFromWix = async (url) => {
+        try {
+            const res = await fetch(`${WIX_API_BASE}/delete_bookmark`, {
+                method: 'DELETE',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url }),
+            });
+            const data = await res.json();
+            return data.success;
+        } catch (err) {
+            console.error("Failed to delete bookmark from Wix", err);
+            return false;
+        }
+    };
+
+    const handleSaveUrl = async () => {
         if (!tempUrl) return;
 
         const updatedInfo = { url: tempUrl };
@@ -61,13 +90,18 @@ export default function App() {
         initializePlayer(tempUrl);
         saveStreamInfo(tempUrl);
 
-        // Add to bookmarks if not already present
         if (!bookmarks.includes(tempUrl)) {
-            setBookmarks(prev => [...prev, tempUrl]);
+            const success = await addBookmarkToWix(tempUrl);
+            if (success) {
+                setBookmarks(prev => [...prev, tempUrl]);
+            }
         }
     };
 
-    // Load shared stream from URL id param
+    useEffect(() => {
+        fetchBookmarks();
+    }, []);
+
     useEffect(() => {
         const query = new URLSearchParams(window.location.search);
         const id = query.get("id");
@@ -100,22 +134,22 @@ export default function App() {
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
-    // Click bookmark to load & play URL
     const handleBookmarkClick = (url) => {
         setTempUrl(url);
         setInfo({ url });
         initializePlayer(url);
     };
 
-    // Delete bookmark from list
-    const handleDeleteBookmark = (url) => {
-        setBookmarks(prev => prev.filter(b => b !== url));
-        // If currently playing that URL, clear it (optional)
-        if (info.url === url) {
-            setInfo({ url: '' });
-            setTempUrl('');
-            videoRef.current.pause();
-            videoRef.current.src = '';
+    const handleDeleteBookmark = async (url) => {
+        const success = await deleteBookmarkFromWix(url);
+        if (success) {
+            setBookmarks(prev => prev.filter(b => b !== url));
+            if (info.url === url) {
+                setInfo({ url: '' });
+                setTempUrl('');
+                videoRef.current.pause();
+                videoRef.current.src = '';
+            }
         }
     };
 
@@ -160,7 +194,6 @@ export default function App() {
                 </div>
             )}
 
-            {/* Bookmarks List */}
             {bookmarks.length > 0 && (
                 <div style={{
                     marginTop: '30px',
